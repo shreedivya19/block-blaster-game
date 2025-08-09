@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Block Blaster</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Arial', sans-serif;
+        }
+
+        .game-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        canvas {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            background: #1a1a2e;
+            display: block;
+        }
+
+        .ui {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .controls {
+            margin-top: 15px;
+            text-align: center;
+            color: white;
+            font-size: 14px;
+        }
+
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            display: none;
+        }
+
+        .restart-btn {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: transform 0.2s;
+        }
+
+        .restart-btn:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="ui">
+            <div>Score: <span id="score">0</span></div>
+            <div>Level: <span id="level">1</span></div>
+            <div>Lives: <span id="lives">3</span></div>
+        </div>
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div class="controls">
+            Use ← → arrow keys or A/D to move paddle • Space to launch ball
+        </div>
+        <div class="game-over" id="gameOver">
+            <h2 id="gameOverTitle">Game Over!</h2>
+            <p id="finalScore">Final Score: 0</p>
+            <button class="restart-btn" onclick="restartGame()">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Game state
+        let gameState = {
+            score: 0,
+            level: 1,
+            lives: 3,
+            gameRunning: true,
+            ballLaunched: false
+        };
+
+        // Paddle
+        const paddle = {
+            x: canvas.width / 2 - 60,
+            y: canvas.height - 30,
+            width: 120,
+            height: 15,
+            speed: 8
+        };
+
+        // Ball
+        const ball = {
+            x: paddle.x + paddle.width / 2,
+            y: paddle.y - 10,
+            radius: 8,
+            dx: 0,
+            dy: 0,
+            speed: 6
+        };
+
+        // Blocks
+        let blocks = [];
+        const blockRows = 6;
+        const blockCols = 10;
+        const blockWidth = 75;
+        const blockHeight = 25;
+        const blockPadding = 5;
+
+        // Colors for different block rows
+        const blockColors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3'];
+
+        // Input handling
+        const keys = {};
+
+        document.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+        });
+
+        document.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
+
+        // Initialize blocks
+        function createBlocks() {
+            blocks = [];
+            for (let row = 0; row < blockRows; row++) {
+                for (let col = 0; col < blockCols; col++) {
+                    blocks.push({
+                        x: col * (blockWidth + blockPadding) + blockPadding,
+                        y: row * (blockHeight + blockPadding) + 50,
+                        width: blockWidth,
+                        height: blockHeight,
+                        color: blockColors[row],
+                        destroyed: false,
+                        points: (blockRows - row) * 10
+                    });
+                }
+            }
+        }
+
+        // Reset ball position
+        function resetBall() {
+            ball.x = paddle.x + paddle.width / 2;
+            ball.y = paddle.y - 10;
+            ball.dx = 0;
+            ball.dy = 0;
+            gameState.ballLaunched = false;
+        }
+
+        // Launch ball
+        function launchBall() {
+            if (!gameState.ballLaunched) {
+                ball.dx = (Math.random() - 0.5) * ball.speed;
+                ball.dy = -ball.speed;
+                gameState.ballLaunched = true;
+            }
+        }
+
+        // Update paddle
+        function updatePaddle() {
+            if ((keys['ArrowLeft'] || keys['KeyA']) && paddle.x > 0) {
+                paddle.x -= paddle.speed;
+            }
+            if ((keys['ArrowRight'] || keys['KeyD']) && paddle.x < canvas.width - paddle.width) {
+                paddle.x += paddle.speed;
+            }
+
+            // Move ball with paddle if not launched
+            if (!gameState.ballLaunched) {
+                ball.x = paddle.x + paddle.width / 2;
+                ball.y = paddle.y - 10;
+            }
+
+            // Launch ball with spacebar
+            if (keys['Space']) {
+                launchBall();
+            }
+        }
+
+        // Update ball
+        function updateBall() {
+            if (!gameState.ballLaunched) return;
+
+            ball.x += ball.dx;
+            ball.y += ball.dy;
+
+            // Wall collisions
+            if (ball.x <= ball.radius || ball.x >= canvas.width - ball.radius) {
+                ball.dx = -ball.dx;
+            }
+            if (ball.y <= ball.radius) {
+                ball.dy = -ball.dy;
+            }
+
+            // Bottom wall (lose life)
+            if (ball.y >= canvas.height + ball.radius) {
+                gameState.lives--;
+                if (gameState.lives <= 0) {
+                    gameOver();
+                } else {
+                    resetBall();
+                }
+            }
+
+            // Paddle collision
+            if (ball.y + ball.radius >= paddle.y &&
+                ball.x >= paddle.x &&
+                ball.x <= paddle.x + paddle.width &&
+                ball.dy > 0) {
+                
+                // Calculate bounce angle based on where ball hits paddle
+                const hitPos = (ball.x - paddle.x) / paddle.width;
+                const angle = (hitPos - 0.5) * Math.PI / 3; // Max 60 degrees
+                
+                ball.dx = ball.speed * Math.sin(angle);
+                ball.dy = -ball.speed * Math.cos(angle);
+            }
+
+            // Block collisions
+            blocks.forEach(block => {
+                if (!block.destroyed &&
+                    ball.x >= block.x &&
+                    ball.x <= block.x + block.width &&
+                    ball.y >= block.y &&
+                    ball.y <= block.y + block.height) {
+                    
+                    block.destroyed = true;
+                    ball.dy = -ball.dy;
+                    gameState.score += block.points;
+                    
+                    // Check for level completion
+                    if (blocks.every(b => b.destroyed)) {
+                        nextLevel();
+                    }
+                }
+            });
+        }
+
+        // Next level
+        function nextLevel() {
+            gameState.level++;
+            ball.speed += 0.5;
+            createBlocks();
+            resetBall();
+        }
+
+        // Game over
+        function gameOver() {
+            gameState.gameRunning = false;
+            document.getElementById('gameOverTitle').textContent = 
+                gameState.lives <= 0 ? 'Game Over!' : 'You Win!';
+            document.getElementById('finalScore').textContent = `Final Score: ${gameState.score}`;
+            document.getElementById('gameOver').style.display = 'block';
+        }
+
+        // Restart game
+        function restartGame() {
+            gameState = {
+                score: 0,
+                level: 1,
+                lives: 3,
+                gameRunning: true,
+                ballLaunched: false
+            };
+            ball.speed = 6;
+            createBlocks();
+            resetBall();
+            document.getElementById('gameOver').style.display = 'none';
+        }
+
+        // Draw functions
+        function drawPaddle() {
+            const gradient = ctx.createLinearGradient(paddle.x, paddle.y, paddle.x, paddle.y + paddle.height);
+            gradient.addColorStop(0, '#4ecdc4');
+            gradient.addColorStop(1, '#44a08d');
+            
+            ctx.fillStyle = gradient;
+            ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
+            
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(paddle.x, paddle.y, paddle.width, paddle.height);
+        }
+
+        function drawBall() {
+            const gradient = ctx.createRadialGradient(ball.x, ball.y, 0, ball.x, ball.y, ball.radius);
+            gradient.addColorStop(0, '#ffffff');
+            gradient.addColorStop(1, '#ff6b6b');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        function drawBlocks() {
+            blocks.forEach(block => {
+                if (!block.destroyed) {
+                    const gradient = ctx.createLinearGradient(block.x, block.y, block.x, block.y + block.height);
+                    gradient.addColorStop(0, block.color);
+                    gradient.addColorStop(1, darkenColor(block.color, 20));
+                    
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(block.x, block.y, block.width, block.height);
+                    
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(block.x, block.y, block.width, block.height);
+                }
+            });
+        }
+
+        function darkenColor(color, percent) {
+            const num = parseInt(color.replace("#", ""), 16);
+            const amt = Math.round(2.55 * percent);
+            const R = (num >> 16) - amt;
+            const G = (num >> 8 & 0x00FF) - amt;
+            const B = (num & 0x0000FF) - amt;
+            return "#" + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+                (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+                (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1);
+        }
+
+        // Update UI
+        function updateUI() {
+            document.getElementById('score').textContent = gameState.score;
+            document.getElementById('level').textContent = gameState.level;
+            document.getElementById('lives').textContent = gameState.lives;
+        }
+
+        // Game loop
+        function gameLoop() {
+            if (gameState.gameRunning) {
+                // Clear canvas
+                ctx.fillStyle = '#1a1a2e';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                updatePaddle();
+                updateBall();
+                updateUI();
+
+                drawBlocks();
+                drawPaddle();
+                drawBall();
+
+                // Show launch instruction
+                if (!gameState.ballLaunched) {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = '20px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('Press SPACE to launch ball', canvas.width / 2, canvas.height / 2);
+                }
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Initialize game
+        createBlocks();
+        gameLoop();
+    </script>
+</body>
+</html>
