@@ -18,5 +18,5 @@ A classic breakout-style game built with HTML5 Canvas and JavaScript.
 ## How to Run
 Simply open `index.html` in any modern web browser.
 
-## Live Demo
+## Live Demo 🎮
 [Play the game here](https://shreedivya19.github.io/block-blaster-game/)# block-blaster-game
