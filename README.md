@@ -1,4 +1,4 @@
-# Block Blaster Game
+# ▃ Block Blaster Game ▄
 
 A classic breakout-style game built with HTML5 Canvas and JavaScript.
 
@@ -8,7 +8,7 @@ A classic breakout-style game built with HTML5 Canvas and JavaScript.
 - Break all blocks to advance to the next level
 - Don't let the ball fall off the bottom!
 
-## Features
+## 👾 Features
 - Multiple levels with increasing difficulty
 - Score system
 - Lives system
